@@ -76,13 +76,22 @@ $remoteBackups |  Where-Object { $_.LastWriteTime -lt (get-date).AddDays(-90) } 
 
 # ------------------Copying backup over to shared drive--------------------------
  
-$newBackups = $localBackups | Where-Object { $_.Name -eq $backupName } | gci | gci
+# $newBackups = $localBackups | Where-Object { $_.Name -eq $backupName } | gci | gci | % { echo $_.Name }
+$subFolderName = gci $localPath/$backupName | % { $_.Name }
+echo "date directory is $subFolderName"
+$newLocalBakFiles = gci $localpath/$backupName/$subFolderName 
 $now = Get-date -format "yyyy.MM.dd-hh.mm.ss"
 
 $newRemoteFolder = New-Item -Path $remotePath -Name $backupname -itemtype "directory"
 $newRemoteSubFolder = New-Item -Path $remotePath\$backupname -Name $now -itemtype "directory"
 
-Invoke-RoboCopy -ActivityName "Copying new backup from $localPath to $remotePath..." -SourcePath $localPath -DestinationPath $remotePath -FilesToCopy  $newBackups -UseRestartableMode
+$targetPath = $newRemoteSubFolder | % { $_.FullName }
+echo "target path: $targetPath"
+echo "bakfiles = $newLocalBakFiles"
+
+Invoke-RoboCopy -ActivityName "Copying new backup from $localPath to $remotePath..." -SourcePath $localPath\$backupName -DestinationPath $remotePath\ -FilesToCopy  $newLocalBakFiles -UseRestartableMode
+# $DevDeploy\0.0.25\scripts\DatabaseCtl.Map.ps1:43:        Copy-DatabaseSnapshots -RemoteSource "$remoteBakFolder" -LocalDestination $localBakFolder -Names ($dbSet.Databases.Name | 
+#ForEach-Object{"$_.bak"})
 
 CleanUpDbUp
 
