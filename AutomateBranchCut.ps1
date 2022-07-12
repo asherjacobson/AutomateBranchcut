@@ -1,8 +1,4 @@
-param
-(
-    [parameter(Mandatory = $false)][string]$backupName
-)
- 
+$userInput = $args[0]
 $localPath = 'C:\Program Files\Microsoft SQL Server\MSSQL13.MSSQLSERVER\MSSQL\Backup\Local'
 $remotePath = '\\fileshare.navex-pe.com\pe\Database Snapshots\Baseline\DevDeploy\EPIM - Copy' 
         
@@ -12,8 +8,6 @@ if(-not (Test-Path "$remotePath")){
  
 $localBackups = Get-ChildItem -Path $localPath 
 $remoteBackups = Get-ChildItem -Path $remotePath
-  
-# check for vpn connection to avoid partial execution of script? won't fail until "copy over" step and will error out when it checks for remote backups of same name
 
 ValidateBackupName
 UpdateBuildObjects
@@ -43,7 +37,7 @@ function ValidateBackupName {
 
     do {
         if ($null -eq $userInput) {
-            $userInput = Read-Host -Prompt "Enter new database backup name. Format should be `n[Release Year]-BR[Counter]-[Trainstop Name]`n`nFor example, ""2022-BR01-Aster"". Check https://confluence.navexglobal.com/pages/viewpage.action?spaceKey=PE&title=Deployment+Train+Stops for the Release Year, and if your branchcut trainstop is the first one in Q1 of next year then the Counter should reset to 01 and you should increment the year (otherwise just increment Counter from the previous branchcut)"
+            $userInput = Read-Host -Prompt "*** Enter new database backup name. Format should be `n[Release Year]-BR[Counter]-[Trainstop Name]`n`nFor example, ""2022-BR01-Aster"". Check https://confluence.navexglobal.com/pages/viewpage.action?spaceKey=PE&title=Deployment+Train+Stops for the Release Year, and if your branchcut trainstop is the first one in Q1 of next year then the Counter should reset to 01 and you should increment the year (otherwise just increment Counter from the previous branchcut)"
         }
  
         Write-Host "`n"
