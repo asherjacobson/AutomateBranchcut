@@ -76,9 +76,13 @@ $remoteBackups |  Where-Object { $_.LastWriteTime -lt (get-date).AddDays(-90) } 
 
 # ------------------Copying backup over to shared drive--------------------------
  
-$newBackup = $localBackups | Where-Object { $_.Name -eq $backupName }
+$newBackups = $localBackups | Where-Object { $_.Name -eq $backupName } | gci | gci
+$now = Get-date -format "yyyy.MM.dd-hh.mm.ss"
 
-Invoke-RoboCopy -ActivityName "Copying new backup from $localPath to $remotePath..." -SourcePath $localPath -DestinationPath $remotePath -FilesToCopy  $newBackup -UseRestartableMode
+$newRemoteFolder = New-Item -Path $remotePath -Name $backupname -itemtype "directory"
+$newRemoteSubFolder = New-Item -Path $remotePath\$backupname -Name $now -itemtype "directory"
+
+Invoke-RoboCopy -ActivityName "Copying new backup from $localPath to $remotePath..." -SourcePath $localPath -DestinationPath $remotePath -FilesToCopy  $newBackups -UseRestartableMode
 
 CleanUpDbUp
 
@@ -115,6 +119,7 @@ function CleanUpDbUp {
     Write-Host "Creating branch $sprint-branchcut-update"
     git checkout -b "$sprint-branchcut-update"
 
+    Write-Host "Checking for old DbUp scripts to remove..."
     RemoveOldScripts "Central"
     RemoveOldScripts "Core"
     RemoveOldScripts "DCService"
@@ -133,7 +138,7 @@ function RemoveOldScripts {
     $path = "C:\git\epim\Applications\DbUp\Navex.CaseManagement.Data.$database\$database Database Scripts" 
 
     Get-ChildItem $path | Where-Object { $_.Name -ne "000001 - Initial Script.sql" -and $_.LastWriteTime -lt (get-date).AddDays(-90) } | % {
-        Write-Host "Deleting old script: \$_..."
-        Remove-Item
+        Write-Host "Deleting old script: \$_.FullName"
+        Remove-Item 
     }
 }
