@@ -8,11 +8,11 @@ function setup {
     
     Write-Host "Invoking RunDevDeploy to ensure we have the latest database versions before creating new backups..."
 
-    # try { RunDevDeploy }
-    # catch { 
-    #     Write-Host "Error while running DevDeploy. Fix that and re-run this script."
-    #     exit
-    # }
+    try { RunDevDeploy }
+    catch { 
+        Write-Host "Error while running DevDeploy. Fix that and re-run this script."
+        exit
+    }
 
     Write-Host "`n ----------------------------------------------------------------- `n RunDevDeploy Complete"
 
@@ -112,6 +112,27 @@ function RemoveOldBackups {
      Get-ChildItem "$localPath\$backupName" | Get-ChildItem | % { Copy-Item $_.FullName -Destination "$remotePath\$backupName" }
  }
 
+
+ function CleanUpDbUp{
+    Write-Host "Checking for old DbUp scripts to remove..."
+    $DBs = "Central", "Core", "DCService", "FileStorage", "Local" | % { 
+
+        $db = $_
+        gci "C:\git\epim\Applications\DbUp\Navex.CaseManagement.Data.$_\$_ Database Scripts" | Where-Object { $_.Name -ne "000001 - Initial Script.sql" -and $_.LastWriteTime -lt (get-date).AddDays(-90) } | % {
+
+        Write-Host "Deleting old script: $_"
+        Remove-Item -Path $_.FullName
+
+        if (-not ($DBsUpdated -contains $db)) { $DBsUpdated += $db}
+    }
+}
+
+    git status
+    git add .
+    git commit -m "deleting DbUp scripts"
+    git push --set-upstream origin "$sprint-branchcut-update"
+ }
+
  Setup
  $backupName = retrieveBackupName
  CreateBranch
@@ -119,10 +140,13 @@ function RemoveOldBackups {
  CreateBackups
  RemoveoldBackups
  CopyBackupsOver
+ CleanUpDbUp
 
-Write-Host "You are on ""$sprint-branchcut-update"" branch. You should now delete any DbUp scripts more than 90 days old, build Visual Studio, ensure you see the changes reflected in the project file, and then push the branch."
+Try { RunDevDeploy }
+Catch {
+    Write-Host "An error ocurred during the final run of DevDeploy which is designed to ensure the branchcut checklist automation script ran correctly. New db copies have likely been added to the remote folder and a branch containing the removal of DbUp scripts may still have been pushed to GitHub. Double check that everything worked as expected."
+}
 
-# Try { RunDevDeploy }
-# Catch {
-#     Write-Host "An error ocurred during the final run of DevDeploy which is designed to ensure the branchcut checklist automation script ran correctly. New db copies have likely been added to the remote folder and a branch containing the removal of DbUp scripts may still have been pushed to GitHub. Double check that everything worked as expected."
-# }
+
+# delete backup local-Copy folder in C:\Program Files\Microsoft SQL Server\MSSQL13.MSSQLSERVER\MSSQL\Backup, dbup, and EPIM-Copy on remote drive
+# don't forget to delete all the branches made by testing this script, both remote and local
