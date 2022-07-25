@@ -118,6 +118,7 @@ function RemoveOldBackups {
     $DBs = "Central", "Core", "DCService", "FileStorage", "Local" | % { 
 
         $db = $_
+        # need to update where caluse below: dcservice initial script doesn't match that file name and yet we don't want to delete it
         gci "C:\git\epim\Applications\DbUp\Navex.CaseManagement.Data.$_\$_ Database Scripts" | Where-Object { $_.Name -ne "000001 - Initial Script.sql" -and $_.LastWriteTime -lt (get-date).AddDays(-90) } | % {
 
         Write-Host "Deleting old script: $_"

@@ -19,26 +19,26 @@ function setup {
     $global:localBackups = Get-ChildItem -Path $localPath 
     $global:remoteBackups = Get-ChildItem -Path $remotePath
 
-    $global:format = '\d{4}-BR\d{2}-[a-zA-Z]{2,20}'
+    $global:format = '\d{4}-BR\d{2}-[A-Z]{2,20}'
     $global:backupName = $null
 }
 
 function RetrieveBackupName {
     do {
-        $userInput = Read-Host -Prompt "`nEnter new database backup name. Format should be `n[Release Year]-BR[Counter]-[Trainstop Name]`n`nFor example, ""2022-BR01-Aster"". Check https://confluence.navexglobal.com/pages/viewpage.action?spaceKey=PE&title=Deployment+Train+Stops for the Release Year, and if your branchcut trainstop is the first one in Q1 of next year then the Counter should reset to 01 and you should increment the year (otherwise just increment Counter from the previous branchcut)"
+        $userInput = (Read-Host -Prompt "`nEnter new database backup name. Format should be `n[Release Year]-BR[Counter]-[Trainstop Name]`n`nFor example, ""2022-BR01-Aster"". Check https://confluence.navexglobal.com/pages/viewpage.action?spaceKey=PE&title=Deployment+Train+Stops for the Release Year, and if your branchcut trainstop is the first one in Q1 of next year then the Counter should reset to 01 and you should increment the year (otherwise just increment Counter from the previous branchcut)").ToUpper()
  
         Write-Host "`n"
         if ($userInput -notmatch $format) {
             Write-Host "Invalid format detected...`n"
         }
  
-        elseif ($localBackups | Where-Object -FilterScript { $_.Name -eq $userInput }) {
+        elseif ($localBackups | Where-Object -FilterScript { $_.Name.ToUpper() -eq $userInput }) {
             # could allow them to continue w/ script which should overwrite existing backup, but that could create confusion
             Write-Host "$userInput already exists in local backups ($localPath). If you wish to overwrite it, simply delete it and re-run this script."
             exit
         }
  
-        elseif ($remoteBackups | Where-Object -FilterScript { $_.Name -eq $userInput }) {
+        elseif ($remoteBackups | Where-Object -FilterScript { $_.Name.ToUpper() -eq $userInput }) {
             Write-Host "$userInput already exists in remote backups ($remotePath). If you wish to overwrite it, simply delete it and re-run this script."
             exit
         }
@@ -57,7 +57,7 @@ function CreateBranch {
     $global:sprint = $parts[2]
     cd "C:/git/epim"
 
-    git checkout . # remove any pre-existing changes
+    git checkout . 
     git checkout develop
     git pull
 
@@ -112,6 +112,37 @@ function RemoveOldBackups {
      Get-ChildItem "$localPath\$backupName" | Get-ChildItem | % { Copy-Item $_.FullName -Destination "$remotePath\$backupName" }
  }
 
+ function CleanUpDbUp {
+    Write-Host "Checking for old DbUp scripts to remove..."
+    $DBs = "Central", "Core", "DCService", "FileStorage", "Local" | % { 
+
+        $db = "$_"
+        gci "C:\git\epim\Applications\DbUp\Navex.CaseManagement.Data.$_\$_ Database Scripts" | Where-Object { $_.Name -notmatch "Initial Script.sql" -and $_.LastWriteTime -lt (get-date).AddHours(-1) } | % {
+
+        Write-Host "Deleting old script: $_"
+        Remove-Item -Path $_.FullName
+
+        $projFilePath = "C:\git\epim\Applications\DbUp\Navex.CaseManagement.Data.$db\Navex.CaseManagement.Data.$db.csproj"
+
+        $scriptReference = Get-ChildItem $projFilePath | Select-String $_.Name
+        $line = $scriptReference | % { $_.LineNumber }
+
+        $projFileContent = Get-Content -Path $projFilePath
+        $lineCount = $projFileContent.count
+
+        $newContent = $projFileContent[0 .. ($line-2)] 
+        $newContent += $projFileContent[($line+2) .. ($lineCount-1)]
+
+        $newContent | Set-Content $projFilePath
+    }
+}
+
+function PushChanges {
+    git add .
+    git commit -m "Deleting DbUp Scripts"
+    git push --set-upstream origin $branch
+ }
+
  Setup
  $backupName = retrieveBackupName
  CreateBranch
@@ -119,6 +150,8 @@ function RemoveOldBackups {
  CreateBackups
  RemoveoldBackups
  CopyBackupsOver
+ CleanUpDbUp
+ PushChanges
 
 Write-Host "You are on ""$sprint-branchcut-update"" branch. You should now delete any DbUp scripts more than 90 days old, build Visual Studio, ensure you see the changes reflected in the project file, and then push the branch."
 
